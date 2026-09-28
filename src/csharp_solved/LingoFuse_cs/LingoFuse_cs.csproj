@@ -22,8 +22,8 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>LingoFuse</RootNamespace>
-    <AssemblyName>LingoFuse</AssemblyName>
+    <RootNamespace>LingoFuse_cs</RootNamespace>
+    <AssemblyName>LingoFuse_cs</AssemblyName>
 
     <!-- Compiler settings (self-contained, no external props needed). -->
     <LangVersion>latest</LangVersion>
@@ -33,7 +33,7 @@
 
     <!-- NuGet package metadata -->
     <IsPackable>true</IsPackable>
-    <PackageId>LingoFuse</PackageId>
+    <PackageId>LingoFuse_cs</PackageId>
     <Title>LingoFuse C# Binding</Title>
     <PackageDescription>
       Cross-language, cross-process, cross-machine RPC framework.

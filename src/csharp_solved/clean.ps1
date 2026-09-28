@@ -57,9 +57,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# The script lives next to csharp_agent.sln and the three projects
-# (agent_api / agent_service / LingoFuse), so $PSScriptRoot is the
-# repository root for cleaning purposes.
+# The script sits next to csharp_agent.sln and the four project folders
+# (agent_api / agent_service / LingoFuse_cs / llm_csharp_tool), so
+# $PSScriptRoot is the repository root for cleaning purposes. The scan
+# below does not depend on these names; they are listed only so that a
+# reader knows what to expect next to the script.
 $RepoRoot = $PSScriptRoot
 
 # ---------------------------------------------------------------------------

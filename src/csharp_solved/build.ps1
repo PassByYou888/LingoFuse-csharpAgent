@@ -11,6 +11,18 @@
     Optionally packs NuGet packages, runs test projects, and cleans
     before building.
 
+    The repository layout this script expects (and which does not have
+    to be modified when a project is added or renamed):
+
+        csharp_agent.sln
+        agent_api/agent_api.csproj
+        agent_service/agent_service.csproj
+        LingoFuse_cs/LingoFuse_cs.csproj
+        llm_csharp_tool/llm_csharp_tool.csproj
+
+    Only csharp_agent.sln and the recursive *.csproj scan are consulted
+    at run time; the list above is documentation, not configuration.
+
 .PARAMETER Configuration
     Build configuration. Accepts Debug (default) or Release.
 
@@ -48,8 +60,8 @@
     Clean, then build and run every test project.
 
 .EXAMPLE
-    .\build.ps1 -Project .\LingoFuse\LingoFuse.csproj
-    Build only the LingoFuse library.
+    .\build.ps1 -Project .\LingoFuse_cs\LingoFuse_cs.csproj
+    Build only the LingoFuse binding library.
 
 .EXAMPLE
     .\build.ps1 -Verbose
@@ -122,7 +134,7 @@ Write-Host ''
 # NOTE: the loop variable used everywhere below is $item, NOT $target.
 # PowerShell treats variable names case-insensitively, so using $target
 # here would overwrite the -Target parameter and trigger its ValidateSet
-# on the first assignment (this was the bug in the previous revision).
+# on the first assignment.
 
 $buildTargets = @()
 $useSolution  = $false

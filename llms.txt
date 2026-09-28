@@ -1,0 +1,286 @@
+# LingoFuse-csharpAgent
+
+> LingoFuse 跨语言智能体通讯体系的 C#/.NET 官方集成层。基于 LingoFuse 底层 C ABI 构建，提供完整的 .NET 绑定、Agent 运行时（信标服务 + 工具提供者）、LLM 客户端 SDK，让任何 .NET 函数可以声明一次即被任意语言的 AI Agent 自动发现并调用。
+
+LingoFuse-csharpAgent 是 LingoFuse 多语言智能体体系在 .NET 生态的落地实现。核心设计目标是**让所有编程语言平等对话**：用 C# 编写的工具，可被 Pascal、Python、C++、Rust、Go、Java、Node.js 等任意语言的 LingoFuse 客户端调用，反之亦然。
+
+---
+
+## 项目定位
+
+- **仓库角色**：C#/.NET 集成层（与 Pascal 的 pasAgent、C++ 的 cppAgent 同级）
+- **技术栈**：.NET 8.0+、P/Invoke、System.Text.Json
+- **底层依赖**：LingoFuse 原生动态库（`LingoFuse64.dll` / `liblingofuse.so`）
+- **目标用户**：需要在 .NET 项目中接入跨语言 AI Agent 能力的开发者
+- **核心价值**：声明一次 → 自动获得 AI Agent 工具、CLI 命令与跨语言插件
+
+---
+
+## 关键特性
+
+- **原生 .NET 绑定**：完整覆盖 DataHandle、AppHandle、Framework、NetworkEvents、LfIo 等全部底层能力
+- **Agent 运行时**：`agent_service`（信标服务）+ `agent_api`（工具提供者），开箱即用
+- **LLM 客户端 SDK**：`llm_csharp_tool` 提供事件驱动的多会话流式客户端
+- **AI Agent 工具**：任何 C# 函数注册为 LingoFuse Call API 后，AI Agent 即可自动发现并调用
+- **跨语言互通**：与 Pascal / Python / C++ / Rust 等语言绑定字节级兼容
+- **统一 JSON 策略**：全链路 UTF-8 无转义、NUL 终止、代理对重写
+- **多模态支持**：文本附件与图片附件（需配合 VLM 后端）
+- **Structured Output**：支持 JSON Schema 约束生成
+
+---
+
+## 仓库结构
+
+```
+src/
+├── csharp_solved/                  # C# 解决方案根目录
+│   ├── LingoFuse_cs/               # .NET 绑定库（核心）
+│   │   ├── DataHandle.cs           # 数据缓冲区 RAII 封装
+│   │   ├── AppHandle.cs            # 应用句柄与 API 注册
+│   │   ├── Framework.cs            # 进程级原生函数门面
+│   │   ├── LfIo.cs                 # 统一 JSON / 字符串 I/O
+│   │   ├── NetworkEvents.cs        # 网络事件回调
+│   │   ├── LingoFuseStatus.cs      # 状态队列与健康检查
+│   │   ├── LingoFuseException.cs   # 异常体系
+│   │   └── Native/                 # P/Invoke 层
+│   │       ├── NativeMethods.cs    # C ABI 声明
+│   │       ├── NativeTypes.cs      # 句柄与回调原型
+│   │       └── Utf8Marshal.cs      # UTF-8 编组辅助
+│   ├── agent_service/              # 信标服务（工具注册中心）
+│   ├── agent_api/                  # 工具提供者（示例：计算器）
+│   └── llm_csharp_tool/            # LLM 客户端 SDK 与 CLI
+├── lingofuse/                      # LingoFuse Python 绑定（跨语言参考）
+├── llm_common/                     # LLM 共享模块（Python 侧）
+├── build_all.ps1                   # 全量构建脚本
+├── build_llm_service.ps1           # LLM 服务构建脚本
+└── ...                             # 其他 Python 服务与文档
+```
+
+---
+
+## 核心组件
+
+### LingoFuse_cs —— .NET 绑定库
+
+| 模块 | 职责 |
+|------|------|
+| `DataHandle` | 原生数据缓冲区 RAII 封装，字节 I/O、原子类型、NUL 帧字符串 |
+| `AppHandle` | 应用句柄管理，Call / Notify API 注册与本地调用 |
+| `Framework` | 进程级原生函数门面：网络准备、远程调用、运行时选项、关闭 |
+| `LfIo` | **统一 JSON / 字符串 I/O**，全链路 UTF-8 无转义策略 |
+| `NetworkEvents` | 进程级网络连接 / 断开事件回调 |
+| `LingoFuseStatus` | 状态队列读取与健康检查 |
+| `Native/` | P/Invoke 声明层，唯一调用原生代码的位置 |
+
+### agent_service —— 信标服务
+
+工具注册中心，暴露的 Call API：
+
+| API | 职责 |
+|-----|------|
+| `agent_log` | 接收日志消息并输出到控制台 |
+| `agent_main` | 返回当前可用工具列表（JSON） |
+| `register_agent` | 动态注册 / 替换工具定义 |
+
+### agent_api —— 工具提供者（示例）
+
+计算器工具提供者，注册的 Call API：
+
+| API | 职责 |
+|-----|------|
+| `add` | 整数加法 |
+| `sub` | 整数减法 |
+| `mul` | 整数乘法 |
+| `div` | 整数除法（浮点结果） |
+
+### llm_csharp_tool —— LLM 客户端 SDK
+
+事件驱动的多会话流式客户端：
+
+- 三种调度模式：主线程泵 / 专用调度线程 / 直通回调线程
+- 能力发现：运行时查询服务端 API 能力矩阵
+- 附件支持：文本文件与图片文件
+- Structured Output：JSON Schema 约束生成
+- 会话管理：创建、切换、关闭、取消
+- 工具调用：与 LTB / MCP 网关配合
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- .NET SDK 8.0+
+- LingoFuse 原生动态库（`LingoFuse64.dll` / `liblingofuse.so`）位于系统 PATH 或可执行文件同目录
+- 可选：LM Studio / Ollama / 任意 OpenAI 兼容后端（用于 LLM 客户端场景）
+
+### 构建
+
+```powershell
+cd src\csharp_solved
+.\build.ps1
+```
+
+### 启动信标服务
+
+```powershell
+.\agent_service.exe
+```
+
+### 启动工具提供者
+
+```powershell
+.\agent_api.exe
+```
+
+### 启动 LLM 客户端
+
+```powershell
+.\llm_csharp_tool.exe --endpoint ipc:llm_service --server-app LLM_Service
+```
+
+---
+
+## 能力矩阵
+
+`llm_csharp_tool` 支持查询服务端 API 能力矩阵（`get_api_capabilities`）：
+
+| API | llm_service | llm_proxy | llm_proxy_tool |
+|-----|:-----------:|:---------:|:--------------:|
+| `generate` | 1 | 1 | 1 |
+| `create_session` | 1 | 1 | 1 |
+| `close_session` | 1 | 1 | 1 |
+| `cancel_session` | 1 | 1 | 1 |
+| `list_sessions` | 1 | 1 | 1 |
+| `set_system_message` | 1 | 0 | 0 |
+| `health` | 1 | 1 | 1 |
+| `llm_stream` | 1 | 1 | 1 |
+| `attachments` | 1 | 1 | 1 |
+| `vision` | 0 | 0 | 0 |
+| `tools` / `tool_calls` / `tool_results` | — | — | 1 |
+| `server_kind` | service | proxy | proxy |
+
+---
+
+## 相关项目
+
+- **LingoFuse** — 智能体时代的跨语言通讯底座（https://github.com/PassByYou888/LingoFuse）
+- **zIPC** — 共享内存 + 消息队列 IPC 引擎（https://github.com/PassByYou888/zIPC）
+- **LingoFuse-pasAgent** — Pascal 智能体技术体系（v2，纯文本）
+- **LingoFuse-pasAgent-v3** — Pascal 智能体技术体系（v3，多模态）
+- **LingoFuse-cppAgent** — C++ 集成层
+- **LingoFuse-Tools** — 代码生成工具链（一份声明 → 30+ 语言绑定）
+
+---
+
+## 文档索引
+
+### LLM 生态文档（位于 `src/`）
+
+- `LingoFuse_LLM_Ecosystem_User_Guide.md` — LLM 生态总览（四大核心应用组件 + 两条路径）
+- `LingoFuse_LLM_Proxy_CLI_Guide.md` — 纯转发代理命令行手册（含多模态转发）
+- `LingoFuse_LLM_Proxy_Tool_CLI_Guide.md` — LLM 工具桥（LTB）命令行手册
+- `LingoFuse_LLM_Service_CLI_guide.md` — 本地推理服务命令行手册（纯文本）
+- `LingoFuse_LLM_Proxy_Compatibility_Guide.md` — 250+ OpenAI 兼容后端清单
+- `NVIDIA-Nemotron-3-Nano-Omni-30B-A3B-Reasoning-UD-IQ4_XS.md` — 推荐模型下载与部署指南
+
+### LingoFuse 核心文档（位于 `src/lingofuse/`）
+
+- `Bridge_User_Guide.md` — HTTP 桥接网关使用指南
+
+### C# 相关文档
+
+- `src/csharp_solved/` — 各 C# 项目源码与 `.csproj` 文件
+- `src/csharp_solved/build.ps1` — C# 解决方案构建脚本
+
+---
+
+## 关键技术概念
+
+### 统一 JSON 策略
+
+所有语言绑定共享同一套 JSON 序列化策略，保证跨语言字节级兼容：
+
+- **UTF-8 无转义**：非 ASCII 字符以字面 UTF-8 字节发送，不产生 `\uXXXX`
+- **NUL 终止**：字符串以单个 0x00 字节结尾，符合 LingoFuse 线协议
+- **代理对重写**：System.Text.Json 默认将补充平面字符转义，`LfIo` 自动重写回原始字符
+- **宽容读取**：缺少 NUL 终止符时读取整个缓冲区
+
+### 两条工具执行路径
+
+- **路径 A（客户端侧）**：MCP 客户端（LM Studio / Claude Desktop）+ `mcp_api_tool` 网关
+- **路径 B（服务端侧，推荐）**：任意客户端 + `llm_proxy_tool`（LTB），服务端代管工具执行
+
+### 信标（Beacon）
+
+LingoFuse 工具注册中心，维护动态注册的工具列表。工具提供者向信标注册，AI Agent 从信标拉取工具列表。
+
+### 能力矩阵
+
+通过 `get_api_capabilities` API 返回的 API 支持情况表，让客户端在运行时发现服务端能力，避免无效 RPC。
+
+---
+
+## 使用场景
+
+### 场景 1：C# 工具被 AI 自动调用
+
+将 C# 业务函数注册为 LingoFuse Call API，AI Agent 即可通过自然语言调用。无需编写 MCP 服务器、无需搭 HTTP 服务。
+
+### 场景 2：跨语言工具复用
+
+用 C# 编写的定价引擎 / 仿真核心 / 批处理模块，可被 Python 数据科学家、Node.js 前端、Pascal 桌面应用同时调用。
+
+### 场景 3：本地 / 私有 AI Agent
+
+`llm_csharp_tool` + `llm_service` 组合可在完全离线环境中运行 AI Agent。敏感数据不出内网。
+
+---
+
+## 构建与部署
+
+### 前置准备
+
+1. 安装 .NET SDK 8.0+
+2. 获取 LingoFuse 原生动态库：
+   - Windows：`LingoFuse64.dll` + `z_ipc_64.dll`
+   - Linux：`liblingofuse.so`
+3. 将动态库所在目录加入系统 PATH，或复制到可执行文件同目录
+
+### 构建命令
+
+```powershell
+# 全量构建
+cd src
+.\build_all.ps1
+
+# 仅构建 C# 解决方案
+cd src\csharp_solved
+.\build.ps1
+
+# 清理
+.\clean.ps1
+
+# 发布
+.\publish.ps1
+```
+
+---
+
+## 许可证
+
+MIT License。详见仓库根目录的 `LICENSE` 文件。
+
+---
+
+## 联系方式
+
+- **维护者**：PassByYou888
+- **反馈渠道**：GitHub Issues
+- **项目主页**：https://github.com/PassByYou888/LingoFuse-csharpAgent
+
+---
+
+**文件版本**：v1.0
+**最后更新**：2026-09-28
+**文件性质**：LLM 检索辅助文件（遵循 llmstxt.org 规范）

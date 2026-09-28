@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LingoFuse\LingoFuse.csproj" />
+    <ProjectReference Include="..\LingoFuse_cs\LingoFuse_cs.csproj" />
   </ItemGroup>
 
 </Project>
